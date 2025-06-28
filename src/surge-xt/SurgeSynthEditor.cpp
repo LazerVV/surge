@@ -271,7 +271,7 @@ SurgeSynthEditor::SurgeSynthEditor(SurgeSynthProcessor &p)
 #if JUCE_WINDOWS
     if (isRunningUnderWine())
     {
-        DBG("Wine detected — forcing software rendering (deferred)");
+        DBG("Wine detected forcing software rendering (deferred)");
     
         // Safely force software rendering via MessageManager
         if (juce::MessageManager::getInstance()->isThisTheMessageThread())
@@ -289,7 +289,7 @@ SurgeSynthEditor::SurgeSynthEditor(SurgeSynthProcessor &p)
         }
     
         // Schedule periodic GUI invalidation only if GUI is fully initialized
-        if (!hasBeenShutDown && isShowing())
+        if (juce::MessageManager::getInstance()->isThisTheMessageThread() && getPeer() && isShowing())
         {
             startTimerHz(1); // repaint workaround
         }

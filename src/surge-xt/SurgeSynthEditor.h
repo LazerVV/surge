@@ -40,7 +40,8 @@ class SurgeJUCELookAndFeel;
 class SurgeSynthEditor : public juce::AudioProcessorEditor,
                          public juce::AsyncUpdater,
                          public juce::FileDragAndDropTarget,
-                         public juce::KeyListener
+                         public juce::KeyListener,
+			 private juce::Timer
 {
   public:
     SurgeSynthEditor(SurgeSynthProcessor &);

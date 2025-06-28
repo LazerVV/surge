@@ -46,6 +46,8 @@ class SurgeSynthEditor : public juce::AudioProcessorEditor,
     SurgeSynthEditor(SurgeSynthProcessor &);
     ~SurgeSynthEditor();
 
+    void timerCallback() override;
+
     static constexpr int extraYSpaceForVirtualKeyboard = 50;
 
     //==============================================================================

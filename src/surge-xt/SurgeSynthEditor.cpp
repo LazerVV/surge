@@ -268,17 +268,23 @@ SurgeSynthEditor::SurgeSynthEditor(SurgeSynthProcessor &p)
     idleTimer = std::make_unique<IdleTimer>(this);
     idleTimer->startTimer(1000 / 60);
 
+#if JUCE_WINDOWS
     if (isRunningUnderWine())
     {
+        DBG("Wine detected — forcing software rendering (deferred)");
+    
         juce::MessageManager::callAsync([this]
         {
             if (auto* peer = getPeer())
             {
-                DBG("Wine detected — forcing software rendering (deferred)");
                 peer->setCurrentRenderingEngine(0);
             }
         });
+    
+        // Start a timer to refresh GUI every 10 seconds to workaround Wine repaint bugs
+        startTimerHz(1); // 1 Hz, run timerCallback() once a second
     }
+#endif
 
 }
 
@@ -339,6 +345,37 @@ void SurgeSynthEditor::setVKBLayout(const std::string layout)
     }
 }
 
+void SurgeSynthEditor::timerCallback()
+{
+#if JUCE_WINDOWS
+    if (!isRunningUnderWine())
+    {
+        stopTimer();
+        return;
+    }
+
+    using namespace std::chrono;
+    static steady_clock::time_point last = steady_clock::now();
+    auto now = steady_clock::now();
+
+    juce::MessageManager::callAsync([this]
+    {
+        if (sge)
+        {
+            DBG("Wine GUI refresh hack triggered");
+            auto zoom = sge->getZoomFactor();
+            auto br = BlockRezoom(this);
+            sge->setZoomFactor(zoom);
+            // Optional wiggle trick if needed:
+            // sge->setBounds(sge->getBounds().withHeight(sge->getHeight() + 1));
+            // sge->setBounds(sge->getBounds().withHeight(sge->getHeight() - 1));
+        }
+    });
+
+        last = now;
+#endif
+}
+
 void SurgeSynthEditor::handleAsyncUpdate() {}
 
 void SurgeSynthEditor::paint(juce::Graphics &g)
@@ -362,20 +399,6 @@ void SurgeSynthEditor::paint(juce::Graphics &g)
 void SurgeSynthEditor::idle()
 {
     sge->idle();
-
-    // Hack for Wine to force constant UI refresh with known method
-    if (isRunningUnderWine())
-    {
-        using namespace std::chrono;
-        static steady_clock::time_point last = steady_clock::now();
-        auto now = steady_clock::now();
-        if (duration_cast<seconds>(now - last).count() >= 10)
-        {
-            auto br = BlockRezoom(this);
-            sge->setZoomFactor(sge->getZoomFactor());
-            last = now;
-        }
-    }
 
     if (processor.surge->refresh_vkb)
     {

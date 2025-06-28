@@ -29,7 +29,15 @@
 #include "RuntimeFont.h"
 #include "AccessibleHelpers.h"
 #include <version.h>
+#include <cstdlib>
+#include <chrono>
 #include "gui/widgets/MainFrame.h"
+
+
+static bool isRunningUnderWine()
+{
+    return std::getenv("WINELOADERNOEXEC") || std::getenv("WINEPREFIX");
+}
 
 struct VKeyboardWheel : public juce::Component
 {
@@ -259,6 +267,19 @@ SurgeSynthEditor::SurgeSynthEditor(SurgeSynthProcessor &p)
 
     idleTimer = std::make_unique<IdleTimer>(this);
     idleTimer->startTimer(1000 / 60);
+
+    if (isRunningUnderWine())
+    {
+        juce::MessageManager::callAsync([this]
+        {
+            if (auto* peer = getPeer())
+            {
+                DBG("Wine detected — forcing software rendering (deferred)");
+                peer->setCurrentRenderingEngine(0);
+            }
+        });
+    }
+
 }
 
 SurgeSynthEditor::~SurgeSynthEditor()
@@ -341,6 +362,20 @@ void SurgeSynthEditor::paint(juce::Graphics &g)
 void SurgeSynthEditor::idle()
 {
     sge->idle();
+
+    // Hack for Wine to force constant UI refresh with known method
+    if (isRunningUnderWine())
+    {
+        using namespace std::chrono;
+        static steady_clock::time_point last = steady_clock::now();
+        auto now = steady_clock::now();
+        if (duration_cast<seconds>(now - last).count() >= 10)
+        {
+            auto br = BlockRezoom(this);
+            sge->setZoomFactor(sge->getZoomFactor());
+            last = now;
+        }
+    }
 
     if (processor.surge->refresh_vkb)
     {

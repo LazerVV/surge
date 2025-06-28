@@ -273,17 +273,27 @@ SurgeSynthEditor::SurgeSynthEditor(SurgeSynthProcessor &p)
     {
         DBG("Wine detected — forcing software rendering (deferred)");
     
-        juce::MessageManager::callAsync([this]
+        // Safely force software rendering via MessageManager
+        if (juce::MessageManager::getInstance()->isThisTheMessageThread())
         {
             if (auto* peer = getPeer())
-            {
                 peer->setCurrentRenderingEngine(0);
-            }
-        });
+        }
+        else
+        {
+            juce::MessageManager::callAsync([this]
+            {
+                if (auto* peer = getPeer())
+                    peer->setCurrentRenderingEngine(0);
+            });
+        }
     
-        // Start a timer to refresh GUI every 10 seconds to workaround Wine repaint bugs
-        startTimerHz(1); // 1 Hz, run timerCallback() once a second
-    }
+        // Schedule periodic GUI invalidation only if GUI is fully initialized
+        if (!hasBeenShutDown && isShowing())
+        {
+            startTimerHz(1); // repaint workaround
+        }
+}
 #endif
 
 }
